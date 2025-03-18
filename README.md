@@ -1,7 +1,7 @@
 # GraphRouter: A Graph-based Router for LLM Selections
 
 <p align="center">
-    <a href="https://ulab-uiuc.github.io/GraphEval/">
+    <a href="https://ulab-uiuc.github.io/GraphRouter/">
         <img alt="Build" src="https://img.shields.io/badge/Project-Page-blue">
     </a>
     <a href="http://arxiv.org/abs/2410.03834">
@@ -27,7 +27,7 @@
 
 
 <p align="center">
-    <a href="https://ulab-uiuc.github.io/GraphEval/">🌐 Project Page</a> |
+    <a href="https://ulab-uiuc.github.io/GraphRouter/">🌐 Project Page</a> |
     <a href="http://arxiv.org/abs/2410.03834">📜 arXiv</a>
     <!-- <a href="xxx">📮 Twitter Post</a> -->
 <p>
