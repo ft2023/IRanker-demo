@@ -106,10 +106,11 @@ python run_exp.py --config_file [config]
 ## Citation
 
 ```bibtex
-@inproceedings{fenggrapheval,
-  title={GraphEval: A Lightweight Graph-Based LLM Framework for Idea Evaluation},
-  author={Feng, Tao and Sun, Yihang and You, Jiaxuan},
-  booktitle={The Thirteenth International Conference on Learning Representations}
+@inproceedings{feng2024graphrouter,
+  title={Graphrouter: A graph-based router for llm selections},
+  author={Feng, Tao and Shen, Yanzhen and You, Jiaxuan},
+  booktitle={The Thirteenth International Conference on Learning Representations},
+  year={2024}
 }
 ```
 
