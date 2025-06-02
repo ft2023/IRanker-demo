@@ -40,33 +40,26 @@
 </div>
 
 
-
-## News
-
-**[2025.01.22]** 🌟 GraphRouter is accepted for ICLR 2025.
-
-
-
 ## 📌Preliminary
 
 
 ### Environment Setup
 
 ```shell
-# create a new environment
-conda create -n graphrouter python=3.10
-conda activate graphrouter
+conda create -n iranker python=3.9
+# install torch [or you can skip this step and let vllm to install the correct version for you]
+pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+# install vllm
+pip3 install vllm==0.6.3 # or you can install 0.5.4, 0.4.2 and 0.3.1
+pip3 install ray
 
-# install pytorch. Modify the command to align with your own CUDA version.
-pip3 install torch  --index-url https://download.pytorch.org/whl/cu118
+# verl
+pip install -e .
 
-# install related libraries
-pip install -r requirements.txt
-
-
-# install pyg
-pip install torch_geometric
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.0+cu118.html
+# flash attention 2
+pip3 install flash-attn --no-build-isolation
+# quality of life
+pip install wandb IPython matplotlib
 
 ```
 
