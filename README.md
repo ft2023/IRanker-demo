@@ -1,4 +1,4 @@
-# GraphRouter: A Graph-based Router for LLM Selections
+# IRanker: Towards Ranking Foundation Model
 
 <p align="center">
     <a href="https://ulab-uiuc.github.io/GraphRouter/">
