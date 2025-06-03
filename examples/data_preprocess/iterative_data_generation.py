@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    data_source = 'combined_ranking'
+    data_source = 'iterative_ranking'
 
     # Load dataset from HuggingFace
     dataset = load_dataset("ulab-ai/Ranking-bench", "iterative")
@@ -72,9 +72,9 @@ if __name__ == '__main__':
     test_dataset = test_dataset.map(function=make_map_fn('test'), with_indices=True)
 
     # Save datasets
-    os.makedirs('data/ranking_combine', exist_ok=True)
-    train_dataset.to_parquet(os.path.join('data/ranking_combine', 'train.parquet'))
-    test_dataset.to_parquet(os.path.join('data/ranking_combine', 'test.parquet'))
+    os.makedirs('data/iterative_ranking', exist_ok=True)
+    train_dataset.to_parquet(os.path.join('data/iterative_ranking', 'train.parquet'))
+    test_dataset.to_parquet(os.path.join('data/iterative_ranking', 'test.parquet'))
 
     # Handle HDFS if specified
     if args.hdfs_dir is not None:

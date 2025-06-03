@@ -12,17 +12,23 @@ def load_module_from_file(file_path):
     spec.loader.exec_module(module)
     return module
 
+def get_task_from_dataset(dataset):
+    """Infer the task from the dataset name."""
+    if dataset.startswith('Passage-'):
+        return 'passage'
+    elif dataset.startswith('Rec-'):
+        return 'rec'
+    elif dataset.startswith('Router-'):
+        return 'router'
+    else:
+        raise ValueError(f"Invalid dataset name: {dataset}. Dataset must start with 'Passage-', 'Rec-', or 'Router-'")
+
 def main():
     parser = argparse.ArgumentParser(description='Evaluation script for different tasks')
     
-    # Task selection argument
-    parser.add_argument('--task', type=str, required=True,
-                      choices=['passage', 'rec', 'router'],
-                      help='Task to evaluate (passage, rec, or router)')
-    
     # Dataset argument
     parser.add_argument('--dataset', type=str, required=True,
-                      help='Dataset to evaluate on')
+                      help='Dataset to evaluate on (e.g., Passage-5, Rec-Movie, Router-Balance)')
     
     # GPU ID argument
     parser.add_argument('--gpu_id', type=str, default='0',
@@ -34,6 +40,9 @@ def main():
     
     args = parser.parse_args()
     
+    # Infer task from dataset name
+    task = get_task_from_dataset(args.dataset)
+    
     # Map task to script file
     script_map = {
         'passage': 'eval_passage.py',
@@ -42,21 +51,26 @@ def main():
     }
     
     # Validate dataset based on task
-    if args.task == 'passage':
-        valid_datasets = ['passage_5', 'passage_7', 'passage_9']
+    if task == 'passage':
+        valid_datasets = ['Passage-5', 'Passage-7', 'Passage-9']
         if args.dataset not in valid_datasets:
             raise ValueError(f"Invalid dataset for passage task. Must be one of {valid_datasets}")
-    elif args.task == 'rec':
-        valid_datasets = ['movie', 'game', 'music']
+    elif task == 'rec':
+        valid_datasets = ['Rec-Movie', 'Rec-Game', 'Rec-Music']
         if args.dataset not in valid_datasets:
             raise ValueError(f"Invalid dataset for rec task. Must be one of {valid_datasets}")
-    elif args.task == 'router':
-        valid_datasets = ['balance', 'cost', 'performance']
+    elif task == 'router':
+        valid_datasets = ['Router-Balance', 'Router-Cost', 'Router-Performance']
         if args.dataset not in valid_datasets:
             raise ValueError(f"Invalid dataset for router task. Must be one of {valid_datasets}")
     
-    # Get the script path
-    script_path = os.path.join(os.path.dirname(__file__), script_map[args.task])
+    # Get the script path - ensure we use the directory where eval.py is located
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(current_dir, script_map[task])
+    
+    # Verify the script exists
+    if not os.path.exists(script_path):
+        raise FileNotFoundError(f"Evaluation script not found: {script_path}")
     
     # Load and run the appropriate module
     module = load_module_from_file(script_path)
