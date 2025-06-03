@@ -328,7 +328,7 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
     for metric, score in metrics.items():
         print(f"{metric}: {score:.4f}")
     
-    output_file = f"./data/new_result/{dataset_name}_batch_{config['checkpoint_path'].split('/')[-1]}.json"
+    output_file = f"./eval/eval_result/{dataset_name}_batch_{config['checkpoint_path'].split('/')[-1]}.json"
     print(f"\nSaving results to {output_file}...")
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
