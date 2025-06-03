@@ -62,24 +62,27 @@ pip3 install flash-attn --no-build-isolation
 pip install wandb IPython matplotlib
 
 ```
+### 📊 Dataset Preparation
 
-### Dataset Preparation
+This section outlines the steps to generate the datasets used for DRanker and IRanker.
 
-First, generate 'data/unified_qa_data.csv'.
+#### DRanker Dataset
 
-```bash
-python data_processing/multidata_unify.py
-```
-Then, generate `data/router_data.csv` and `configs/llm_description_embedding.pkl` by setting your api_key in `configs/config.yaml`.
+To generate the DRanker dataset, run the following command:
 
 ```bash
-python data_processing/construct_router_data.py
+python examples/data_preprocess/direct_data_generation.py
 ```
 
-For your convenience, we provide download links for the 'unified_qa_data.csv' and 'router_data.csv' files we generated. Please download them and put them in `data` folder.
+#### IRanker Dataset
+To generate the IRanker dataset, execute this script:
+```bash
+python examples/data_preprocess/iterative_data_generation.py
+```
 
-[unified_qa_data.csv](https://drive.google.com/file/d/1__SY7UScvX1xPWeX1NK6ZulLMdZTqBcI/view?usp=share_link)
-[router_data.csv](https://drive.google.com/file/d/1YYn-BV-5s2amh6mKLqKMR0H__JB-CKU4/view?usp=share_link)
+#### Raw Dataset
+The raw dataset is available for download at:
+Ranking-bench on Hugging Face Datasets
 
 ## ⭐Experiments
 
