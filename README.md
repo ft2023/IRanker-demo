@@ -105,7 +105,39 @@ Run experiments and print/save evaluation results on metrics Performance, Cost, 
 python run_exp.py --config_file [config]
 ```
 
+## 🔍 Evaluation
 
+### Running Evaluation
+
+To evaluate a model on a specific dataset, use the following command:
+
+```bash
+python eval/eval.py --dataset <dataset_name> --model_path <path_to_model>
+```
+
+### Parameters
+
+- `--dataset`: Specifies the dataset to evaluate on
+- `--model_path`: Path to the trained model you want to evaluate
+
+### Supported Datasets
+
+The evaluation script supports the following datasets:
+
+#### Passage Ranking
+- `Passage-5` 
+- `Passage-7` 
+- `Passage-9` 
+
+#### Router Tasks
+- `Router-Performance`
+- `Router-Balance` 
+- `Router-Cost` 
+
+#### Recommendation Systems
+- `Rec-Movie` 
+- `Rec-Music` 
+- `Rec-Game`
 
 
 ## Citation
