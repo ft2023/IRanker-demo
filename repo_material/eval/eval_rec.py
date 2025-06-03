@@ -13,12 +13,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import html
 import pylcs
+from datasets import load_dataset
 
 # Configuration
 CONFIG = {
-    'movie': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_rec/data/movie_all_test.json',
+    'Rec-Movie': {
+        'checkpoint_path': '',
         'prompt_template': "I've watched the following movies in the past, in order:\n{user_his_text}\n\n" \
                           "Now there are {num_candidates} candidate movies that I might watch next:\n{candidate_text_order}\n\n" \
                           "Please select the one movie that is least likely to be my next watch, according to my watching history. Please think step by step.\n" \
@@ -26,9 +26,8 @@ CONFIG = {
                           "You can NOT generate or reference movies that are not in the given candidate list.\n" \
                           "Return only the full name of the movie."
     },
-    'game': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_rec/data/game_all_test.json',
+    'Rec-Game': {
+        'checkpoint_path': '',
         'prompt_template': "I've purchased the following items in the past, in order:\n{user_his_text}\n\n" \
                           "Now there are {num_candidates} candidate items that I might purchase next:\n{candidate_text_order}\n\n" \
                           "Please select the one item that is least likely to be my next purchase, according to my purchase history. Please think step by step.\n" \
@@ -36,11 +35,8 @@ CONFIG = {
                           "You can NOT generate or reference items that are not in the given candidate list.\n" \
                           "Return only the full name of the item."
     },
-    'music': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        # 'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_rec/data/music_all_test.json',
-        # 'input_file': '/data/taofeng2/tiny_rec/All_split/data/ranking_combine/test.parquet',
+    'Rec-Music': {
+        'checkpoint_path': '',
         'prompt_template': "I've purchased the following items in the past, in order:\n{user_his_text}\n\n" \
                           "Now there are {num_candidates} candidate items that I might purchase next:\n{candidate_text_order}\n\n" \
                           "Please select the one item that is least likely to be my next purchase, according to my purchase history. Please think step by step.\n" \
@@ -186,29 +182,8 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
             prompt = get_prompt(dataset_name, user_his_text, sample['candidate_text'])
             batch_prompts.append(prompt)
         
-        # print("\nSample Prompt:")
-        # print("="*80)
-        # print(batch_prompts[0])
-        # print("="*80)
-
-        # Generate responses for all prompts in one batch
-
-        # import pandas as pd
-        # data = pd.read_parquet('/data/taofeng2/tiny_rec/All_split/data/ranking_combine/test.parquet')
-        # data = data.head(10).to_dict('records')
-
-        # temp = '<|im_start|>system\nYou are a helpful assistant. You first think about the reasoning process in the mind and then provides the user with the answer.<|im_end|>\n<|im_start|>user\n Help me choose the most weird item from the following list: Apple, Banana, Orange, Pear and iPhone 15 Pro Max.  Show your thinking process and give definitive answer in the end. Enclose your thoughts in <think> and </think>, and enclose your answer in answer and the corresponding token.<|im_end|> <|im_start|>assistant\nLet me solve this step by step.\n<think> '
-        
-
-        # outputs = llm.generate([data[0]['prompt'][0]['content']], sampling_params)
         outputs = llm.generate(batch_prompts, sampling_params)
-        # outputs = llm.generate(['Explain multi head attention'], sampling_params)
 
-        # print("\nSample Response:")
-        # print("="*80)
-        # print(outputs[0].outputs[0].text.strip())
-        # print("="*80)
-        
         # Process results and update samples
         for output, sample in zip(outputs, active_samples):
             response = output.outputs[0].text.strip()
@@ -336,14 +311,16 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
         stop=["</s>", "<|endoftext|>"],
     )
 
-    # Load all data
-    print("Loading input data...")
-    with open(config['input_file'], 'r') as f:
-        data = json.load(f)
-        # data = data[:10]
-    
+    # Load dataset from HuggingFace and filter by task_name
+    print("Loading input data from HuggingFace dataset...")
+    ds = load_dataset("ulab-ai/Ranking-bench", "direct")['test']
+    filtered_data = [x for x in ds if x.get('task_name') == dataset_name]
+    if not filtered_data:
+        raise ValueError(f"No data found for task_name={dataset_name} in the loaded dataset.")
+    # Each item in filtered_data should have 'problem', 'gt_item', and 'candidate_items'
+    # If not, you may need to adapt the field names accordingly
     # Process all data in one go
-    results = process_batch(data, llm, sampling_params, dataset_name)
+    results = process_batch(filtered_data, llm, sampling_params, dataset_name)
     
     # Calculate and save metrics
     metrics = calculate_metrics(results)
@@ -362,8 +339,8 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Evaluate recommendation model on different datasets')
-    parser.add_argument('--dataset', type=str, required=True, choices=['movie', 'game', 'music'],
-                      help='Dataset to evaluate on')
+    parser.add_argument('--dataset', type=str, required=True, choices=['Rec-Movie', 'Rec-Game', 'Rec-Music'],
+                      help='Dataset to evaluate on (Rec-Movie, Rec-Game, Rec-Music)')
     parser.add_argument('--gpu_id', type=str, default='3',
                       help='GPU ID to use (default: 0)')
     parser.add_argument('--model_path', type=str, required=True,

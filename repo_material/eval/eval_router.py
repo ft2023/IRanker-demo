@@ -13,6 +13,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import html
 import pylcs
+from datasets import load_dataset
 
 # Configuration
 LLM_DESCRIPTIONS = {
@@ -29,9 +30,8 @@ LLM_DESCRIPTIONS = {
 }
 
 CONFIG = {
-    'balance': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_router/data_split/router_all_Balance_test.json',
+    'Router-Balance': {
+        'checkpoint_path': '',
         'prompt_template': """I've been given the following query:
 {query}
 
@@ -46,9 +46,8 @@ You MUST choose exactly one LLM from the given candidate list.
 You can NOT generate or reference LLMs that are not in the given candidate list.
 Return only the full name of the LLM."""
     },
-    'cost': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_router/data_split/router_all_Cost First_test.json',
+    'Router-Cost': {
+        'checkpoint_path': '',
         'prompt_template': """I've been given the following query:
 {query}
 
@@ -63,9 +62,8 @@ You MUST choose exactly one LLM from the given candidate list.
 You can NOT generate or reference LLMs that are not in the given candidate list.
 Return only the full name of the LLM."""
     },
-    'performance': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_router/data_split/router_all_Performance First_test.json',
+    'Router-Performance': {
+        'checkpoint_path': '',
         'prompt_template': """I've been given the following query:
 {query}
 
@@ -306,10 +304,10 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
     active_samples = []
     for sample in batch_data:
         active_samples.append({
-            'query': sample['query'],
-            'gt_llm': sample['gt_llm'],
-            'candidate_text': sample['candidate_text'].copy(),
-            'original_length': len(sample['candidate_text']),
+            'query': sample['problem'],
+            'gt_llm': sample['gt'],
+            'candidate_text': sample['candidates'].copy(),
+            'original_length': len(sample['candidates']),
             'removed_items': [],
             'ground_truth_rank': None,
             'is_complete': False
@@ -329,11 +327,6 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
         for sample in active_samples:
             prompt = get_prompt(dataset_name, sample['query'], sample['candidate_text'])
             batch_prompts.append(prompt)  
-
-        # print("\nSample Prompt:")
-        # print("="*80)
-        # print(batch_prompts[0])
-        # print("="*80)
 
         # Generate responses for all prompts in one batch
         outputs = llm.generate(batch_prompts, sampling_params)
@@ -473,13 +466,28 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
         stop=["</s>", "<|endoftext|>"],
     )
 
-    # Load all data
-    print("Loading input data...")
-    with open(config['input_file'], 'r') as f:
-        data = json.load(f)
-    
+    # Load all data from HuggingFace datasets
+    print("Loading input data from HuggingFace datasets...")
+    ds = load_dataset("ulab-ai/Ranking-bench", "direct")['test']
+    # Map dataset_name to the correct subset in ds
+    if dataset_name == 'Router-Balance':
+        data = [x for x in ds if x['task_name'] == 'Router-Balance']
+    elif dataset_name == 'Router-Cost':
+        data = [x for x in ds if x['task_name'] == 'Router-Cost']
+    elif dataset_name == 'Router-Performance':
+        data = [x for x in ds if x['task_name'] == 'Router-Performance']
+    else:
+        raise ValueError(f"Unknown dataset_name: {dataset_name}")
+    # Convert to expected format for process_batch
+    batch_data = []
+    for x in data:
+        batch_data.append({
+            'problem': x['query'],
+            'gt': x['gt_llm'],
+            'candidates': x['candidates']
+        })
     # Process all data
-    results = process_batch(data, llm, sampling_params, dataset_name)
+    results = process_batch(batch_data, llm, sampling_params, dataset_name)
     
     # Calculate and save metrics
     metrics = calculate_metrics(results)
@@ -501,9 +509,9 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Evaluate LLM router model')
-    parser.add_argument('--dataset', type=str, default='balance',
-                      choices=['balance', 'cost', 'performance'],
-                      help='Dataset to evaluate on (default: balance)')
+    parser.add_argument('--dataset', type=str, default='Router-Balance',
+                      choices=['Router-Balance', 'Router-Cost', 'Router-Performance'],
+                      help='Dataset to evaluate on (default: Router-Balance)')
     parser.add_argument('--gpu_id', type=str, default='0',
                       help='GPU ID to use (default: 0)')
     parser.add_argument('--model_path', type=str, required=True,
