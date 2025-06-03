@@ -62,11 +62,11 @@ pip3 install flash-attn --no-build-isolation
 pip install wandb IPython matplotlib
 
 ```
-### 📊 Dataset Preparation
+## 📊 Dataset Preparation
 
-This section outlines the steps to generate the datasets used for DRanker and IRanker.
+This section outlines the steps to generate the datasets used for DRanker and IRanker training and evaluation.
 
-#### DRanker Dataset
+### DRanker Dataset
 
 To generate the DRanker dataset, run the following command:
 
@@ -74,15 +74,24 @@ To generate the DRanker dataset, run the following command:
 python examples/data_preprocess/direct_data_generation.py
 ```
 
-#### IRanker Dataset
+The processed dataset will be saved to: `data/direct_ranking`
+
+### IRanker Dataset
+
 To generate the IRanker dataset, execute this script:
+
 ```bash
 python examples/data_preprocess/iterative_data_generation.py
 ```
 
-#### Raw Dataset
-The raw dataset is available for download at:
-Ranking-bench on Hugging Face Datasets
+The processed dataset will be saved to: `data/iterative_ranking`
+
+### Raw Dataset
+
+The original raw dataset is available for download from Hugging Face:
+
+**Dataset Repository:** [ulab-ai/Ranking-bench](https://huggingface.co/datasets/ulab-ai/Ranking-bench)
+
 
 ## ⭐Experiments
 
