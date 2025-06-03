@@ -304,9 +304,9 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
     active_samples = []
     for sample in batch_data:
         active_samples.append({
-            'query': sample['problem'],
-            'gt_llm': sample['gt'],
-            'candidate_text': sample['candidates'].copy(),
+            'problem': sample['problem'],
+            'gt': sample['gt'],
+            'candidates': sample['candidates'].copy(),
             'original_length': len(sample['candidates']),
             'removed_items': [],
             'ground_truth_rank': None,
@@ -320,12 +320,12 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
     while True:
         iteration += 1
         print(f"\nIteration {iteration}:")
-        print(f"{len(active_samples[0]['candidate_text'])}/{active_samples[0]['original_length']} items remaining")
+        print(f"{len(active_samples[0]['candidates'])}/{active_samples[0]['original_length']} items remaining")
         
         # Prepare batch of prompts for active samples
         batch_prompts = []
         for sample in active_samples:
-            prompt = get_prompt(dataset_name, sample['query'], sample['candidate_text'])
+            prompt = get_prompt(dataset_name, sample['problem'], sample['candidates'])
             batch_prompts.append(prompt)  
 
         # Generate responses for all prompts in one batch
@@ -345,13 +345,13 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
             
             response_list = equation.split('\n')[0].strip()
             # First check for exact match
-            if response_list in sample['candidate_text']:
+            if response_list in sample['candidates']:
                 final_response = response_list
-            elif response_list.lower() in [x.lower() for x in sample['candidate_text']]:
-                final_response = sample['candidate_text'][[x.lower() for x in sample['candidate_text']].index(response_list.lower())]
+            elif response_list.lower() in [x.lower() for x in sample['candidates']]:
+                final_response = sample['candidates'][[x.lower() for x in sample['candidates']].index(response_list.lower())]
             else:
-                matched_items = match_and_order_lists([response_list], sample['candidate_text'])
-                final_response = matched_items[0] if matched_items else find_most_similar(response_list, sample['candidate_text'])
+                matched_items = match_and_order_lists([response_list], sample['candidates'])
+                final_response = matched_items[0] if matched_items else find_most_similar(response_list, sample['candidates'])
             
             if response_list != final_response:
                 print(f"Vanil response: {response_list}")
@@ -360,10 +360,10 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
             
             # Update sample state
             sample['removed_items'].append(final_response)
-            sample['candidate_text'].remove(final_response)
+            sample['candidates'].remove(final_response)
             
             # Check if ground truth was found
-            if final_response == sample['gt_llm']:
+            if final_response == sample['gt']:
                 rank = sample['original_length'] - len(sample['removed_items']) + 1
                 sample['ground_truth_rank'] = rank
                 rank_findings[rank] = rank_findings.get(rank, 0) + 1
@@ -371,14 +371,14 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
         # Check if all samples have reached final state
         all_complete = True
         for sample in active_samples:
-            if len(sample['candidate_text']) > 1:
+            if len(sample['candidates']) > 1:
                 all_complete = False
                 break
         
         if all_complete:
             # Process final state for all samples
             for sample in active_samples:
-                if len(sample['candidate_text']) == 1:
+                if len(sample['candidates']) == 1:
                     if sample['ground_truth_rank'] is None:
                         sample['ground_truth_rank'] = 1
                         rank_findings[1] = rank_findings.get(1, 0) + 1
@@ -386,11 +386,11 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
                 results.append({
                     'ground_truth_rank': sample['ground_truth_rank'],
                     'removed_items': sample['removed_items'],
-                    'final_candidates': sample['candidate_text'],
+                    'final_candidates': sample['candidates'],
                     'iterations': iteration,
-                    'final_remaining': len(sample['candidate_text']),
-                    'query': sample['query'],
-                    'gt_llm': sample['gt_llm']
+                    'final_remaining': len(sample['candidates']),
+                    'problem': sample['problem'],
+                    'gt': sample['gt']
                 })
             break
     
@@ -482,8 +482,8 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
     batch_data = []
     for x in data:
         batch_data.append({
-            'problem': x['query'],
-            'gt': x['gt_llm'],
+            'problem': x['problem'],
+            'gt': x['gt'],
             'candidates': x['candidates']
         })
     # Process all data

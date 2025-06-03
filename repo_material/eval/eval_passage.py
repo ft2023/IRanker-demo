@@ -12,30 +12,28 @@ from vllm import LLM, SamplingParams
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pylcs
+from datasets import load_dataset
 
 # Configuration
 CONFIG = {
-    'passage_5': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_ms_marco/data/passage_all_test_5_candidate.json',
+    'Passage-5': {
+        'checkpoint_path': '',
         'prompt_template':"Here is a query: {query}.\n" \
                           "And here are the candidate passages:\n{passages_text}\n\n" \
                           "Please think step by step according to the content of each passage and how well it supports or relates to the query. " \
                           "Select the least likely passage from the candidate list. Only return the passage ID corresponding to the excluded passage (e.g., \"passage x\"). " \
                           "You MUST choose one passage from the candidate list. You can not generate content that is not in the given candidate list."
     },
-    'passage_7': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_ms_marco/data/passage_all_test_7_candidate.json',
+    'Passage-7': {
+        'checkpoint_path': '',
         'prompt_template':"Here is a query: {query}.\n" \
                           "And here are the candidate passages:\n{passages_text}\n\n" \
                           "Please think step by step according to the content of each passage and how well it supports or relates to the query. " \
                           "Select the least likely passage from the candidate list. Only return the passage ID corresponding to the excluded passage (e.g., \"passage x\"). " \
                           "You MUST choose one passage from the candidate list. You can not generate content that is not in the given candidate list."
     },
-    'passage_9': {
-        'checkpoint_path': '/data/taofeng2/tiny_rec/All_split/checkpoints/TinyZero/ranking_foundation/actor/global_step_1500',
-        'input_file': '/data/taofeng2/tiny_rec/rank_dataset/data_ms_marco/data/passage_all_test_9_candidate.json',
+    'Passage-9': {
+        'checkpoint_path': '',
         'prompt_template':"Here is a query: {query}.\n" \
                           "And here are the candidate passages:\n{passages_text}\n\n" \
                           "Please think step by step according to the content of each passage and how well it supports or relates to the query. " \
@@ -155,9 +153,9 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
     for sample in batch_data:
         active_samples.append({
             'problem': sample['problem'],
-            'gt_passage': sample['gt_passage'],
-            'candidate_passages': sample['candidate_passages'].copy(),
-            'original_length': len(sample['candidate_passages']),
+            'gt': sample['gt'],
+            'candidates': sample['candidates'].copy(),
+            'original_length': len(sample['candidates']),
             'removed_passages': [],
             'ground_truth_rank': None,
             'is_complete': False,
@@ -171,23 +169,17 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
     while True:
         iteration += 1
         print(f"\nIteration {iteration}:")
-        print(f"{len(active_samples[0]['candidate_passages'])}/{active_samples[0]['original_length']} passages remaining")
+        print(f"{len(active_samples[0]['candidates'])}/{active_samples[0]['original_length']} passages remaining")
         
         # Prepare batch of prompts for active samples
         batch_prompts = []
         for sample in active_samples:
             user_his_text = sample['problem'].split("and candidate passages")[0].split("Here is a query:")[1].strip()
-            prompt = get_prompt(dataset_name, user_his_text, sample['candidate_passages'])
+            prompt = get_prompt(dataset_name, user_his_text, sample['candidates'])
             batch_prompts.append(prompt)
         
         # Generate responses for all prompts in one batch
         outputs = llm.generate(batch_prompts, sampling_params)
-        
-        # Print sample response for this iteration
-        print("\nSample Response:")
-        print("="*80)
-        print(outputs[0].outputs[0].text.strip())
-        print("="*80)
         
         # Process results and update samples
         for output, sample in zip(outputs, active_samples):
@@ -202,16 +194,16 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
                 passage_id = response[-40:]
             
             # First check for exact match
-            if passage_id in sample['candidate_passages']:
+            if passage_id in sample['candidates']:
                 final_response = passage_id
             else:
                 # Try to match using the more sophisticated matching function
-                matched_items = match_and_order_lists([passage_id], list(sample['candidate_passages'].keys()))
+                matched_items = match_and_order_lists([passage_id], list(sample['candidates'].keys()))
                 if matched_items:
                     final_response = matched_items[0]
                 else:
                     # Fall back to similarity-based matching
-                    final_response = find_most_similar(passage_id, list(sample['candidate_passages'].keys()))
+                    final_response = find_most_similar(passage_id, list(sample['candidates'].keys()))
             
             if passage_id != final_response:
                 print(f"Original response: {passage_id}")
@@ -219,10 +211,10 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
             
             # Update sample state
             sample['removed_passages'].append(final_response)
-            del sample['candidate_passages'][final_response]
+            del sample['candidates'][final_response]
             
             # Check if ground truth was found
-            if final_response == sample['gt_passage']:
+            if final_response == sample['gt']:
                 rank = sample['original_length'] - len(sample['removed_passages']) + 1
                 sample['ground_truth_rank'] = rank
                 rank_findings[rank] = rank_findings.get(rank, 0) + 1
@@ -230,14 +222,14 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
         # Check if all samples have reached final state
         all_complete = True
         for sample in active_samples:
-            if len(sample['candidate_passages']) > 1:
+            if len(sample['candidates']) > 1:
                 all_complete = False
                 break
         
         if all_complete:
             # Process final state for all samples
             for sample in active_samples:
-                if len(sample['candidate_passages']) == 1:
+                if len(sample['candidates']) == 1:
                     if sample['ground_truth_rank'] is None:
                         sample['ground_truth_rank'] = 1
                         rank_findings[1] = rank_findings.get(1, 0) + 1
@@ -250,9 +242,9 @@ def process_batch(batch_data: List[Dict[str, Any]], llm: LLM, sampling_params: S
                     'reasoning': sample['reasoning'],
                     'ground_truth_rank': sample['ground_truth_rank'],
                     'removed_passages': sample['removed_passages'],
-                    'final_candidates': list(sample['candidate_passages'].keys()),
+                    'final_candidates': list(sample['candidates'].keys()),
                     'iterations': iteration,
-                    'final_remaining': len(sample['candidate_passages'])
+                    'final_remaining': len(sample['candidates'])
                 })
             break
     
@@ -298,6 +290,34 @@ def calculate_metrics(results: List[Dict[str, Any]]) -> Dict[str, float]:
     # Calculate averages
     return {k: np.mean(v) for k, v in metrics.items()}
 
+def parse_problem_text(problem: str) -> Dict[str, str]:
+    """Parse the problem text to extract query and create candidate dictionary.
+    
+    Args:
+        problem: The problem text containing query and passages
+        
+    Returns:
+        Dict containing query and candidate passages dictionary
+    """
+    # Extract query
+    query = problem.split("and candidate passages:")[0].replace("## Here is a query:", "").strip()
+    
+    # Extract passages
+    passages_text = problem.split("and candidate passages:")[1].split("Please think step by step")[0].strip()
+    
+    # Create dictionary of passages
+    passages_dict = {}
+    for line in passages_text.split("\n"):
+        if line.startswith("passage"):
+            passage_id = line.split(":")[0].strip()
+            passage_text = line.split(":", 1)[1].strip()
+            passages_dict[passage_id] = passage_text
+    
+    return {
+        "query": query,
+        "candidates": passages_dict
+    }
+
 def main(dataset_name: str, gpu_id: str, model_path: str):
     if dataset_name not in CONFIG:
         raise ValueError(f"Unknown dataset: {dataset_name}. Available datasets: {list(CONFIG.keys())}")
@@ -319,9 +339,7 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
     print("Loading model...")
     llm = LLM(
         model=config['checkpoint_path'],
-        enable_chunked_prefill=True,
-        max_num_batched_tokens=512,
-        gpu_memory_utilization=0.5
+        gpu_memory_utilization=0.95
     )
     
     # Configure sampling parameters
@@ -332,10 +350,22 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
         stop=["</s>", "<|endoftext|>"],
     )
     
-    # Load all data
-    print("Loading input data...")
-    with open(config['input_file'], 'r') as f:
-        data = json.load(f)
+    # Load dataset from HuggingFace
+    print("Loading dataset from HuggingFace...")
+    ds = load_dataset("ulab-ai/Ranking-bench", "direct")['test']
+    
+    # Filter dataset by task name
+    ds = ds.filter(lambda x: x['task_name'] == dataset_name)
+    
+    # Convert dataset to list of dictionaries with required format
+    data = []
+    for item in ds:
+        parsed = parse_problem_text(item['problem'])
+        data.append({
+            'problem': item['problem'],
+            'gt': item['gt'],
+            'candidates': parsed['candidates']
+        })
     
     # Process all data in one go
     results = process_batch(data, llm, sampling_params, dataset_name)
@@ -364,10 +394,10 @@ def main(dataset_name: str, gpu_id: str, model_path: str):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Evaluate passage ranking model on MSMARCO dataset')
-    parser.add_argument('--dataset', type=str, default='passage_5',
-                      help='Dataset to evaluate on (default: passage_5)')
+    parser.add_argument('--dataset', type=str, default='Passage-5',
+                      help='Dataset to evaluate on (default: Passage-5)')
     parser.add_argument('--gpu_id', type=str, default='0',
-                      help='GPU ID to use (default: 4)')
+                      help='GPU ID to use (default: 0)')
     parser.add_argument('--model_path', type=str, required=True,
                       help='Path to the model checkpoint to use for evaluation')
     args = parser.parse_args()
